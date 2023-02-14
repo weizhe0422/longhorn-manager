@@ -3,10 +3,9 @@ package util
 import (
 	"context"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"math"
 	"sync"
-
-	"github.com/sirupsen/logrus"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -14,10 +13,15 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
 
+	"github.com/longhorn/longhorn-manager/controller"
 	longhorn "github.com/longhorn/longhorn-manager/k8s/pkg/apis/longhorn/v1beta2"
 	lhclientset "github.com/longhorn/longhorn-manager/k8s/pkg/client/clientset/versioned"
 	"github.com/longhorn/longhorn-manager/meta"
 	"github.com/longhorn/longhorn-manager/types"
+)
+
+var (
+	checkUpgradeURL = "https://longhorn-upgrade-responder.rancher.io/v1/checkupgrade"
 )
 
 type ProgressMonitor struct {
@@ -143,4 +147,8 @@ func CreateOrUpdateLonghornVersionSetting(namespace string, lhClient *lhclientse
 		return err
 	}
 	return nil
+}
+
+func getSupportedK8sVersions(lhVersion string) (string, error) {
+	tmp := controller.CheckUpgradeURL
 }

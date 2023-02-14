@@ -882,44 +882,14 @@ func (sc *SettingController) syncUpgradeChecker() error {
 }
 
 func (sc *SettingController) CheckLatestAndStableLonghornVersions() (string, string, error) {
-	var (
-		resp    CheckUpgradeResponse
-		content bytes.Buffer
-	)
-	kubeVersion, err := sc.kubeClient.Discovery().ServerVersion()
+	upgradeResp, err := sc.GetUpgradeResponderContent()
 	if err != nil {
-		return "", "", errors.Wrap(err, "failed to get Kubernetes server version")
-	}
-
-	req := &CheckUpgradeRequest{
-		AppVersion: sc.version,
-		ExtraInfo:  map[string]string{"kubernetesVersion": kubeVersion.GitVersion},
-	}
-	if err := json.NewEncoder(&content).Encode(req); err != nil {
-		return "", "", err
-	}
-	r, err := http.Post(checkUpgradeURL, "application/json", &content)
-	if err != nil {
-		return "", "", err
-	}
-	defer r.Body.Close()
-	if r.StatusCode != http.StatusOK {
-		message := ""
-		messageBytes, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			message = err.Error()
-		} else {
-			message = string(messageBytes)
-		}
-		return "", "", fmt.Errorf("query return status code %v, message %v", r.StatusCode, message)
-	}
-	if err := json.NewDecoder(r.Body).Decode(&resp); err != nil {
 		return "", "", err
 	}
 
 	latestVersion := ""
 	stableVersions := []string{}
-	for _, v := range resp.Versions {
+	for _, v := range upgradeResp.Versions {
 		for _, tag := range v.Tags {
 			if tag == VersionTagLatest {
 				latestVersion = v.Name
@@ -932,8 +902,49 @@ func (sc *SettingController) CheckLatestAndStableLonghornVersions() (string, str
 	if latestVersion == "" {
 		return "", "", fmt.Errorf("cannot find latest Longhorn version during CheckLatestAndStableLonghornVersions")
 	}
+
 	sort.Strings(stableVersions)
 	return latestVersion, strings.Join(stableVersions, ","), nil
+}
+
+func (sc *SettingController) GetUpgradeResponderContent() (CheckUpgradeResponse, error) {
+	var (
+		resp    CheckUpgradeResponse
+		content bytes.Buffer
+	)
+
+	kubeVersion, err := sc.kubeClient.Discovery().ServerVersion()
+	if err != nil {
+		return resp, errors.Wrap(err, "failed to get Kubernetes server version")
+	}
+
+	req := &CheckUpgradeRequest{
+		AppVersion: sc.version,
+		ExtraInfo:  map[string]string{"kubernetesVersion": kubeVersion.GitVersion},
+	}
+	if err := json.NewEncoder(&content).Encode(req); err != nil {
+		return resp, err
+	}
+
+	r, err := http.Post(checkUpgradeURL, "application/json", &content)
+	if err != nil {
+		return resp, err
+	}
+	defer r.Body.Close()
+	if r.StatusCode != http.StatusOK {
+		message := ""
+		messageBytes, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			message = err.Error()
+		} else {
+			message = string(messageBytes)
+		}
+		return resp, fmt.Errorf("query return status code %v, message %v", r.StatusCode, message)
+	}
+	if err := json.NewDecoder(r.Body).Decode(&resp); err != nil {
+		return resp, err
+	}
+	return resp, nil
 }
 
 func (sc *SettingController) enqueueSetting(obj interface{}) {
