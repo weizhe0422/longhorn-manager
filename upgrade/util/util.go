@@ -141,9 +141,16 @@ func CreateOrUpdateLonghornVersionSetting(namespace string, lhClient *lhclientse
 		return err
 	}
 
+	k8sCurLonghorn, err := lhClient.LonghornV1beta2().Settings(namespace).Get(context.TODO(), string(types.SettingNameCurrentLonghornSupportedK8sVersions), metav1.GetOptions{})
+
 	if s.Value != meta.Version {
 		s.Value = meta.Version
-		_, err = lhClient.LonghornV1beta2().Settings(namespace).Update(context.TODO(), s, metav1.UpdateOptions{})
+		if _, err = lhClient.LonghornV1beta2().Settings(namespace).Update(context.TODO(), s, metav1.UpdateOptions{}); err == nil {
+			// clear up k8s version if Longhorn version update successful
+			k8sCurLonghorn.Value = ""
+			_, err = lhClient.LonghornV1beta2().Settings(namespace).Update(context.TODO(), k8sCurLonghorn, metav1.UpdateOptions{})
+		}
+
 		return err
 	}
 	return nil
